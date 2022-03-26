@@ -1,0 +1,12 @@
+{
+	"manifest_version": 1,
+	"id": "217a590f-d455-4e09-acd5-84b2040a0c6f",
+	"app_min_version": "2.7",
+	"version": "1.0.0",
+	"name": "todoGenerator",
+	"description": "todo list creator",
+	"author": "Connor O&#39;Toole",
+	"homepage_url": "https://joplinapp.org/api/get_started/plugins/",
+	"repository_url": "https://github.com/otoolecf/joplinTodoGenerator.git",
+	"keywords": []
+}
