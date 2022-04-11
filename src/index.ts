@@ -12,12 +12,11 @@ joplin.plugins.register({
 				if (note) {
 					let last_header = findLastTimeHeader(note.body);
 					console.log("addTimestamp: Last timestamp header: ", last_header);
-					//TODO: math to find out if need to add or not
-					let new_timestamp = generateTimestamp();
+					let new_timestamp = generateTimestamp(last_header.line_data);
 					console.log("New timestamp: ", new_timestamp);
 				}
 			} catch(err){
-				console.log("ERROR: setNewTimestamp: ", err.message);
+				console.log("ERROR: addTimestamp: ", err.message);
 			}
 		}
 		await joplin.workspace.onNoteSelectionChange(() => {
@@ -34,7 +33,7 @@ function findLastTimeHeader(note_body) {
 	if(!lines || !lines.length) return;
 	lines.forEach((line,i) => {
 		let header = {line_data: undefined, line_num: undefined};
-		if (line.match(/===/)) {
+		if (line && line.match(/===/)) {
 			header.line_data = line;
 			header.line_num = i;
 			time_headers.push(header);
@@ -42,18 +41,40 @@ function findLastTimeHeader(note_body) {
 	});
 	return time_headers.pop();
 }
-function generateTimestamp() {
-	try {
+function getHoursPassed(last_header) {
+	let current_datetime = new Date(Date.now());
+	let last_datetime = convertDateFromString(last_header);
+	let hours_passed = getTimeDiff(current_datetime, last_datetime);
+	console.log("getHoursPassed: ", hours_passed);
+	return hours_passed;
+}
+
+function generateTimestamp(last_header) {
 		//check if === separator exists yet
 		//if no timeheader, set
 		//if timeheader, check if full day has passed
 		//set timestamp on current line regardless if > 4 hrs since last
 		let current_datetime = new Date(Date.now());
-		let datetime = current_datetime.toLocaleString();
-		return datetime;
-	} catch(err){
-		console.log("ERROR: setNewTimestamp: ", err.message);
-	}
+		let current_datetime_str = current_datetime.toLocaleString();
+		let hours_passed;
+		if (last_header) hours_passed = getHoursPassed(last_header);
+		let append_str;
+		if (hours_passed) {
+			if (hours_passed > 4 || hours_passed < 0) {
+				console.log("New timestamp needed. Hours passed: ", hours_passed);
+				if (hours_passed > 24 || hours_passed < 0) {
+					append_str =  `======== ${current_datetime_str}\n`;
+				} else {
+					append_str = `${current_datetime}\n`;
+				}
+			}
+			console.log("string to append: ", append_str);
+		} else {
+			//no timestamp passed in, make a new one
+			append_str =  `======== ${current_datetime_str}\n`;
+		}
+		console.log("New timestamp: ", append_str);
+		return append_str;
 }
 
 function getTimeDiff(a_date, b_date){
@@ -76,5 +97,6 @@ function convertDateFromString(str) {
 	if (!date_match || !date_match.length) return;
 	let date_millis = Date.parse(date_match[0]);
 	let date = new Date(date_millis);
+	console.log("convertDateFromString: date: ", date);
 	return date;
 }
