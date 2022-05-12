@@ -7,47 +7,18 @@ const keywords = ["TODO", "TIP", "IDEA"];
 const special_command_marker = "//";
 const ignore_timestamp_command = "NO TIMESTAMP";
 let last_line = {content: undefined, index: undefined};
+const date_regex = /\d{1,2}\/\d{1,2}\/\d{4}.?\s\d{1,2}:\d{2}:?(\d{2})?(\s[AP]M)?/;
 
 joplin.plugins.register({
 	onStart: async function() {
 		console.info('Hello world. Test plugin started!');
-		async function logicHandler() {
-			try {
-				const note = await joplin.workspace.selectedNote();
-				console.log("logicHandler: note.title: ", note.title);
-				if (note && note.title !== TODO_TITLE) {
-					// console.log("note found. Note id: ", note.id);
-					let new_timestamp = await addTimestamp(note.body)
-					if (new_timestamp) {
-						console.log("time for new timestamp! appending to note...")
-						await apppendToNote(note.id, note.body, new_timestamp, true);
-					}
-					let todo_items = findKeywords(note.body);
-					console.log("logicHandler: found keywords: ", todo_items);
-					todo_items = todo_items.filter(item => item.keyword === "TODO");
-					console.log("logicHandler: found todos: ", todo_items);
-					if (todo_items && todo_items.length) {
-						console.log("logicHandler: creating todos!");
-						for (let i=0; i<todo_items.length; i++) {
-							let todo = todo_items[i];
-							await createTodo(note.id, todo.line, todo.pos);
-						}
-					}
- 				}
-			} catch(err){
-				console.log("ERROR: addTimestamp: ", err.message);
-			}
-		}
 		await joplin.workspace.onNoteSelectionChange(() => {
 			//fires when new note selected
 			logicHandler();
 		});
 		await joplin.workspace.onNoteChange(async () => {
 			// runs when note changes
-			let note_changed = await noteChangeChecker();
-			if (note_changed) {
-				logicHandler();
-			}
+			logicHandler();
 		});
 		//runs when plugin starts
 		logicHandler();
@@ -55,11 +26,44 @@ joplin.plugins.register({
 	},
 });
 
+async function logicHandler() {
+	try {
+		const note = await joplin.workspace.selectedNote();
+		console.log("logicHandler: note.title: ", note.title);
+		if (note) {
+			if (note.title !== TODO_TITLE) {
+				// console.log("note found. Note id: ", note.id);
+				let note_changed = noteChangeChecker(note);
+				if (!note_changed) return;
+				let new_timestamp = await addTimestamp(note.body)
+				if (new_timestamp) {
+					console.log("time for new timestamp! appending to note...")
+					await apppendToNote(note.id, note.body, new_timestamp, true);
+				}
+				let todo_items = findKeywords(note.body);
+				console.log("logicHandler: found keywords: ", todo_items);
+				todo_items = todo_items.filter(item => item.keyword === "TODO");
+				console.log("logicHandler: found todos: ", todo_items);
+				if (todo_items && todo_items.length) {
+					console.log("logicHandler: creating todos!");
+					for (let i=0; i<todo_items.length; i++) {
+						let todo = todo_items[i];
+						await createTodo(note, todo.line, todo.pos);
+					}
+				}
+			} else {
+				// found todo note
+				await checkIfDoneTodos(note);
+			}
+		}
+	} catch(err){
+		console.log("ERROR: addTimestamp: ", err.message);
+	}
+}
 
-async function noteChangeChecker() {
+async function noteChangeChecker(note) {
 	// returns true if the current note has changed significantly (newline, etc)
 	let note_changed = false;
-	const note = await joplin.workspace.selectedNote();
 	let lines = note.body.split('\n');
 	if (lines && lines.length) {
 		let current_line_index = lines.length - 1;
@@ -119,13 +123,17 @@ function getHoursPassed(last_header) {
 	return hours_passed;
 }
 
+function newTimestampStr() {
+	let current_datetime = new Date(Date.now());
+	let current_datetime_str = current_datetime.toLocaleString('en-US', {hour12: false});
+	return current_datetime_str;
+}
 function generateTimestamp(last_header) {
 	//check if === separator exists yet
 	//if no timeheader, set
 	//if timeheader, check if full day has passed
 	//set timestamp on current line regardless if > 4 hrs since last
-	let current_datetime = new Date(Date.now());
-	let current_datetime_str = current_datetime.toLocaleString();
+	let current_datetime_str = newTimestampStr();
 	let hours_passed;
 	if (last_header) hours_passed = getHoursPassed(last_header);
 	let append_str;
@@ -164,7 +172,7 @@ function getTimeDiff(a_date, b_date){
 
 function convertDateFromString(str) {
 	// dates will look like 4/10/2022, 12:09:11 PM or 08/04/2022 10:15, all locale time 
-	let date_match = str.match(/\d{1,2}\/\d{1,2}\/\d{4}.?\s\d{1,2}:\d{2}:?(\d{2})?(\s[AP]M)?/);
+	let date_match = str.match(date_regex);
 	console.log("convertDateFromString: date_match: ", date_match);
 	if (!date_match || !date_match.length) return;
 	let date_millis = Date.parse(date_match[0]);
@@ -172,6 +180,24 @@ function convertDateFromString(str) {
 	// console.log("convertDateFromString: date: ", date);
 	return date;
 }
+
+async function updateLine(id, note_body, new_str, line_idx, current_note) {
+	try {
+		//adjust note body
+		let lines = note_body.split('\n');
+		lines[line_idx] = new_str;
+		console.log("updateLine: idx: ", line_idx, " new_st: ", new_str);
+		let new_body = lines.join("\n");
+		await joplin.data.put(['notes', id], null, { body: new_body });
+		if (current_note) {
+			console.log("current_note, refreshing note...");
+			await joplin.commands.execute('editor.setText', new_body);
+		}
+		return;
+	} catch (err) {
+		console.log("ERROR: updateLine: ", err);
+	}
+};
 
 async function apppendToNote(id, note_body, append_str, current_note) {
 	try {
@@ -211,10 +237,10 @@ function findKeywords(note_body, start_idx = 0) {
 }
 
 
-async function createTodo(src_id, todo_text, todo_idx) {
+async function createTodo(src_note, todo_text, todo_idx) {
 	try {
 		let todo_note;
-		let append_str = todo_text + " || src_note_id: " + src_id + " , src_idx: " + todo_idx;
+		let append_str ="- [ ] " + todo_text + " [" +src_note.title + ":" + todo_idx + "](:/" + src_note.id + ") \n";
 		let existing_notes = await joplin.data.get(['notes'], {query: TODO_TITLE, fields: ['id', 'title', 'body']});
 		existing_notes = existing_notes.items;
 		console.log("createTodo: data GET result: ", existing_notes);
@@ -235,10 +261,77 @@ async function createTodo(src_id, todo_text, todo_idx) {
 			await joplin.data.post(['notes'], null, new_todos_params);
 		}
 		//TODO: Link the todos to proper note
-		//TODO: cross out old todos
+		//TODO: add tips and ideas to system
+		//TODO: update line numbers daily
+		//TODO: need to ignore crossed out todos (don't want to double up)
 		return;
 	} catch(err) {
 		console.log("ERROR: createTodo: ", err.message);
+	}
+}
+
+async function todoComplete(todo_line) {
+	// how do I check if todos changed?
+	console.log("todocomplete, finding the note info now!");
+ 	let note_info = todo_line.match(/\[([a-zA-Z0-9.\s-]+:[0-9]+)\]\(:\/([a-z0-9]+)\)/);
+	console.log("todoComplete: note_info: ", note_info);
+	if (note_info && note_info.length) {
+		let full_note = note_info[0];
+	 	let titleLine = note_info[1].split(":");
+		let noteTitle = titleLine[0];
+		let noteLine = titleLine[1];
+		let noteId = note_info[2];
+		let target = await joplin.data.get(['notes', noteId], {fields: ['id', 'title', 'body']});
+		if (target) {
+			let lines = target.body.split('\n');
+			let old_str = lines[noteLine];
+			let new_str = "~~" + old_str + "~~";
+			await updateLine(noteId, target.body, new_str, noteLine, undefined);
+		}
+	}
+	return;
+}
+
+// THIS IS ALL HANDLED NATIVELY!
+// async function jumpToNote(noteId, noteLine) {
+// 	//can also try codemirror lineup/linedown func and goto start, goto end
+// 	try {
+// 		console.log("changing to note: ", noteId);
+// 		await joplin.commands.execute("openNote", noteId);
+// 		await joplin.commands.execute('editor.execCommand', {
+// 			name: 'scrollIntoView',
+// 			args: [{line: noteLine, char: 0}],
+// 		});
+// 	} catch (err) {
+// 		console.log("ERROR: jumpToNote: ", err);
+// 	}
+// }
+
+async function checkIfDoneTodos(current_note) {
+	// should only fire on change in todo note
+	// timestamp only added when todo marked done in original note
+	// sort by done date? Add create date to todos? (Nah, not rn)
+	try {
+		console.log("checking for done todos!");
+		if (current_note.title !== TODO_TITLE) return;
+		let lines = current_note.body.split('\n');
+		for(let i=0; i <lines.length; i++){
+			let line = lines[i];
+			if (line.match(/-\s\[x\]/)) {
+				let date_match = line.match(date_regex);
+				console.log("line date match: ", date_match);
+				if (!date_match) {
+					console.log("found line without timestamp, need to cross out todo in original note");
+					// process done todo and add timestmap
+					await todoComplete(line);
+					let new_str = line + newTimestampStr();
+					await updateLine(current_note.id, current_note.body, new_str , i, true);
+				}
+			}
+		}
+		return;
+	} catch (err) {
+		console.log("ERROR: checkIfDoneTodos: ", err);
 	}
 }
 
