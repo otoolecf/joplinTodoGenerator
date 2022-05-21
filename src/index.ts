@@ -3,14 +3,21 @@ import joplin from 'api';
 import JoplinSettings from 'api/JoplinSettings';
 import { time, timeEnd } from 'console';
 
-// TODO: test  the new logic more fully (clean slate)
-// TODO: integrate tips and ideas in similar manner (won't be cross out, will have creation timestamp)
 // TODO: update line numbers of todos?
 
 
 const TODO_TITLE = "Todos";
 const DONE_TODO_TITLE = "Done Todos";
-const keywords = ["TODO", "TIP", "IDEA"];
+const TIP_TITLE = "Tips";
+const IDEA_TITLE = "Ideas";
+// don't want to timestamp on special notes
+const reserved_notes = [TODO_TITLE, DONE_TODO_TITLE, TIP_TITLE, IDEA_TITLE];
+let note_keywords = [
+	{note_title: TODO_TITLE, keyword: "TODO:"},
+	{note_title: TIP_TITLE, keyword: "TIP:"},
+	{note_title: IDEA_TITLE, keyword: "IDEA:"},
+];
+// const keywords = ["TODO", "TIP", "IDEA"];
 const special_command_marker = "//";
 const ignore_timestamp_command = "NO TIMESTAMP";
 let last_line = {content: undefined, index: undefined};
@@ -38,7 +45,7 @@ async function logicHandler() {
 		const note = await joplin.workspace.selectedNote();
 		console.log("logicHandler: note.title: ", note.title);
 		if (note) {
-			if (note.title !== TODO_TITLE && note.title !== DONE_TODO_TITLE) {
+			if (!reserved_notes.includes(note.title)) {
 				// console.log("note found. Note id: ", note.id);
 				let note_changed = await noteChangeChecker(note);
 				if (!note_changed) return;
@@ -47,15 +54,15 @@ async function logicHandler() {
 					console.log("time for new timestamp! appending to note...")
 					await apppendToNote(note.id, note.body, new_timestamp, true);
 				}
-				let todo_items = findKeywords(note.body);
-				console.log("logicHandler: found keywords: ", todo_items);
-				todo_items = todo_items.filter(item => item.keyword === "TODO");
-				console.log("logicHandler: found todos: ", todo_items);
-				if (todo_items && todo_items.length) {
-					console.log("logicHandler: creating todos!");
-					for (let i=0; i<todo_items.length; i++) {
-						let todo = todo_items[i];
-						await createTodo(note, todo.line, todo.pos);
+				let keyword_items = findKeywords(note.body);
+				console.log("logicHandler: found keywords: ", keyword_items);
+				// todo_items = todo_items.filter(item => item.keyword === "TODO");
+				// console.log("logicHandler: found todos: ", todo_items);
+				if (keyword_items && keyword_items.length) {
+					console.log("logicHandler: creating keyword items!");
+					for (let i=0; i<keyword_items.length; i++) {
+						let item = keyword_items[i];
+						await createListItem(note, item.line, item.pos, item.note_keyword);
 					}
 				}
 			} else {
@@ -260,45 +267,53 @@ function findKeywords(note_body, start_idx = 0) {
 	if(lines && lines.length && start_idx < lines.length) {
 		lines = lines.slice(start_idx);
 		lines.forEach((line, l_idx) => {
-			keywords.forEach(kw => {
+			note_keywords.forEach(kw => {
 				// ignore keywords that are already crossed out
-				if (line.match(kw) && !line.match("~~")) keyword_instances.push({keyword: kw, line: line, pos: start_idx + l_idx});
+				if (line.match(kw.keyword) && !line.match("~~")) keyword_instances.push({note_keyword: kw, line: line, pos: start_idx + l_idx});
 			});
 		});
 	}
 	return keyword_instances;
 }
 
-
-async function createTodo(src_note, todo_text, todo_idx) {
+async function createListItem(src_note, text, idx, note_keyword) {
 	try {
-		let todo_note;
-		let split_todo = todo_text.split("TODO:");
-		let clean_text = split_todo[split_todo.length - 1];
-		console.log("createTodo: clean_text: ", clean_text);
-		let append_str ="- [ ] " + clean_text.trim() + " [" +src_note.title + ":" + todo_idx + "](:/" + src_note.id + ") \n";
-		let existing_notes = await joplin.data.get(['notes'], {query: TODO_TITLE, fields: ['id', 'title', 'body']});
+		if (!note_keyword || !note_keyword.keyword || !note_keyword.note_title) throw new Error("note_keyword required.");
+		console.log("createListItem: creating item for note: ", note_keyword.note_title);
+		let target_note;
+		let split_str = note_keyword.keyword;
+		let split_text = text.split(split_str);
+		let clean_text = split_text[split_text.length - 1];
+		console.log("createListItem: clean_text: ", clean_text);
+		let append_str;
+		if (note_keyword.note_title == TODO_TITLE) {
+			append_str ="- [ ] " + clean_text.trim() + " [" +src_note.title + ":" + idx + "](:/" + src_note.id + ") \n";
+		} else {
+			append_str = "- " + clean_text.trim() + " [" +src_note.title + ":" + idx + "](:/" + src_note.id + ") \n";
+		}
+		let existing_notes = await joplin.data.get(['notes'], {query: note_keyword.title, fields: ['id', 'title', 'body']});
 		existing_notes = existing_notes.items;
-		console.log("createTodo: data GET result: ", existing_notes);
+		console.log("createListItem: data GET result: ", existing_notes);
 		if (existing_notes && existing_notes.length) {
-			todo_note = existing_notes.find(n => n.title === TODO_TITLE);
-			console.log("todo_note: ", todo_note);
+			console.log("existing notes found. looking for note_keyword.title: ", note_keyword.note_title);
+			target_note = existing_notes.find(n => n.title === note_keyword.note_title);
+			console.log("target_note: ", target_note);
 		} 
-		if (todo_note) {
-			if (!todo_note.body.includes(clean_text)) {
-				await apppendToNote(todo_note.id, todo_note.body, append_str, false);
+		if (target_note) {
+			if (!target_note.body.includes(clean_text)) {
+				await apppendToNote(target_note.id, target_note.body, append_str, false);
 			} else {
-				console.log("createTodo: Todo list already includes clean_text: ", clean_text);
+				console.log("createListItem: List already includes clean_text: ", clean_text);
 			}
 		} else {
-			//create the todo note
-			console.log("createTodo: no todo_note found. Creating new note!");
-			let new_todos_params = {"title": TODO_TITLE, "body": append_str};
-			await joplin.data.post(['notes'], null, new_todos_params);
+			//create the target note
+			console.log("createListItem: no todo_note found. Creating new note!");
+			let new_note_params = {"title": note_keyword.note_title, "body": append_str};
+			await joplin.data.post(['notes'], null, new_note_params);
 		}
 		return;
 	} catch(err) {
-		console.log("ERROR: createTodo: ", err.message);
+		console.log("ERROR: createListItem: ", err.message);
 	}
 }
 
