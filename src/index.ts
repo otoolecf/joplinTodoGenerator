@@ -21,7 +21,7 @@ let note_keywords = [
 const special_command_marker = "//";
 const ignore_timestamp_command = "NO TIMESTAMP";
 let last_line = {content: undefined, index: undefined};
-const date_regex = /\d{1,2}\/\d{1,2}\/\d{4}.?\s\d{1,2}:\d{2}:?(\d{2})?(\s[AP]M)?/;
+const date_regex = /\d{1,2}\/\d{1,2}\/\d{2,4}.?\s\d{1,2}:\d{2}:?(\d{2})?(\s[AP]M)?/;
 
 joplin.plugins.register({
 	onStart: async function() {
