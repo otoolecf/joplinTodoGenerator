@@ -55,9 +55,7 @@ async function logicHandler() {
 					await apppendToNote(note.id, note.body, new_timestamp, true);
 				}
 				let keyword_items = findKeywords(note.body);
-				console.log("logicHandler: found keywords: ", keyword_items);
-				// todo_items = todo_items.filter(item => item.keyword === "TODO");
-				// console.log("logicHandler: found todos: ", todo_items);
+				// console.log("logicHandler: found keywords: ", keyword_items);
 				if (keyword_items && keyword_items.length) {
 					console.log("logicHandler: creating keyword items!");
 					for (let i=0; i<keyword_items.length; i++) {
@@ -101,7 +99,7 @@ async function addTimestamp(note_body) {
 	// if so, execute commands
 	let lines = note_body.split('\n');
 	let special_lines = lines.filter(line => line.includes(special_command_marker));
-	console.log("addTimestamp: special lines: ", special_lines);
+	// console.log("addTimestamp: special lines: ", special_lines);
 	if (special_lines) {
 		let ignore_command = special_lines.find(line => line.includes(ignore_timestamp_command));
 		if (ignore_command) {
@@ -187,7 +185,7 @@ function getTimeDiff(a_date, b_date){
 function convertDateFromString(str) {
 	// dates will look like 4/10/2022, 12:09:11 PM or 08/04/2022 10:15, all locale time 
 	let date_match = str.match(date_regex);
-	console.log("convertDateFromString: date_match: ", date_match);
+	// console.log("convertDateFromString: date_match: ", date_match);
 	if (!date_match || !date_match.length) return;
 	let date_millis = Date.parse(date_match[0]);
 	let date = new Date(date_millis);
@@ -284,7 +282,6 @@ async function createListItem(src_note, text, idx, note_keyword) {
 		let split_str = note_keyword.keyword;
 		let split_text = text.split(split_str);
 		let clean_text = split_text[split_text.length - 1];
-		console.log("createListItem: clean_text: ", clean_text);
 		let append_str;
 		if (note_keyword.note_title == TODO_TITLE) {
 			append_str ="- [ ] " + clean_text.trim() + " [" +src_note.title + ":" + idx + "](:/" + src_note.id + ") \n";
@@ -293,9 +290,7 @@ async function createListItem(src_note, text, idx, note_keyword) {
 		}
 		let existing_notes = await joplin.data.get(['notes'], {query: note_keyword.title, fields: ['id', 'title', 'body']});
 		existing_notes = existing_notes.items;
-		console.log("createListItem: data GET result: ", existing_notes);
 		if (existing_notes && existing_notes.length) {
-			console.log("existing notes found. looking for note_keyword.title: ", note_keyword.note_title);
 			target_note = existing_notes.find(n => n.title === note_keyword.note_title);
 			console.log("target_note: ", target_note);
 		} 
@@ -322,7 +317,6 @@ async function addDoneTodo(todo_text) {
 		let done_note;
 		let existing_notes = await joplin.data.get(['notes'], {query: DONE_TODO_TITLE, fields: ['id', 'title', 'body']});
 		existing_notes = existing_notes.items;
-		console.log("addDoneTodo: data GET result: ", existing_notes);
 		if (existing_notes && existing_notes.length) {
 			done_note = existing_notes.find(n => n.title === DONE_TODO_TITLE);
 			console.log("todo_note: ", done_note);
@@ -362,7 +356,6 @@ async function todoComplete(todo_line) {
 			let split_line = old_str.split("TODO");
 			let new_str = split_line.join("~~TODO");
 			new_str = new_str + "~~";
-			console.log("todoComplete: new_str: ", new_str);
 			await updateLine(noteId, target.body, new_str, noteLine, undefined);
 		}
 	}
@@ -379,7 +372,6 @@ async function checkIfDoneTodos(current_note) {
 			let line = lines[i];
 			if (line.match(/-\s\[x\]/)) {
 				let date_match = line.match(date_regex);
-				console.log("line date match: ", date_match);
 				if (!date_match) {
 					console.log("found line without timestamp, need to cross out todo in original note");
 					// process done todo and add timestmap
