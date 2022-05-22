@@ -5,7 +5,7 @@
 	"version": "1.0.0",
 	"name": "todoGenerator",
 	"description": "todo list creator",
-	"author": "Connor O&#39;Toole",
+	"author": "Connor O'Toole",
 	"homepage_url": "https://joplinapp.org/api/get_started/plugins/",
 	"repository_url": "https://github.com/otoolecf/joplinTodoGenerator.git",
 	"keywords": []
