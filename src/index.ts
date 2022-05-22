@@ -25,7 +25,7 @@ const date_regex = /\d{1,2}\/\d{1,2}\/\d{4}.?\s\d{1,2}:\d{2}:?(\d{2})?(\s[AP]M)?
 
 joplin.plugins.register({
 	onStart: async function() {
-		console.info('Hello world. Test plugin started!');
+		console.info('Starting todo generator plugin!');
 		await joplin.workspace.onNoteSelectionChange(() => {
 			//fires when new note selected
 			logicHandler();
