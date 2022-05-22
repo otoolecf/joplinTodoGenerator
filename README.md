@@ -22,7 +22,8 @@ The `Todos` note list has the added functionality of checkbox style items. When 
 In addition to the list functionality, timestamps will automatically be generated in normal notes that are not one of the special cases above. Timestamps are only generated upon opening a note. 
 
 There are 2 types of timestamp categories: timestamp headers and normal timestamps. Timestmap headers feature a newline in the format `======== 5/22/2022, 09:31:41`, and will be appended to the note when 24 hours has passed since the last timestamp header. Normal timestamps are in the format `5/22/2022, 09:31:41` and will be appended when more than 4 hours have passed since the last timestamp or timestamp header.
-If this behavior is not desired in a certain note, the following line can be added:
+
+If timestamp behavior is not desired in a certain note, the following line can be added:
 
 `\\ NO TIMESTAMP`
 
