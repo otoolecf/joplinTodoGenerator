@@ -153,7 +153,7 @@ function generateTimestamp(last_header) {
 	if (last_header && hours_passed) {
 		if (hours_passed > 4 || hours_passed < 0) {
 			console.log("generateTimestamp: New timestamp needed. Hours passed: ", hours_passed);
-			if (hours_passed > 24 || hours_passed < 0) {
+			if (hours_passed > 12 || hours_passed < 0) {
 				append_str =  `======== ${current_datetime_str}\n`;
 			} else {
 				append_str = `${current_datetime_str}\n`;
