@@ -12,7 +12,7 @@ const TIP_TITLE = "Tips";
 const IDEA_TITLE = "Ideas";
 // don't want to timestamp on special notes
 const reserved_notes = [TODO_TITLE, DONE_TODO_TITLE, TIP_TITLE, IDEA_TITLE];
-let note_keywords = [
+const note_keywords = [
 	{note_title: TODO_TITLE, keyword: "TODO:"},
 	{note_title: TIP_TITLE, keyword: "TIP:"},
 	{note_title: IDEA_TITLE, keyword: "IDEA:"},
@@ -35,20 +35,20 @@ joplin.plugins.register({
 			logicHandler();
 		});
 		//runs when plugin starts
-		logicHandler();
+		logicHandler(true);
 
 	},
 });
 
-async function logicHandler() {
+async function logicHandler(start=undefined) {
 	try {
 		const note = await joplin.workspace.selectedNote();
-		console.log("logicHandler: note.title: ", note.title);
+		// console.log("logicHandler: note.title: ", note.title);
 		if (note) {
 			if (!reserved_notes.includes(note.title)) {
 				// console.log("note found. Note id: ", note.id);
 				let note_changed = await noteChangeChecker(note);
-				if (!note_changed) return;
+				if (!note_changed && !start) return;
 				let new_timestamp = await addTimestamp(note.body)
 				if (new_timestamp) {
 					console.log("time for new timestamp! appending to note...")
@@ -82,14 +82,17 @@ async function noteChangeChecker(note) {
 	if (lines && lines.length) {
 		let current_line_index = lines.length - 1;
 		let current_line = lines.pop();
-		if (last_line.content && last_line.index) {
-			if (last_line.index !== current_line_index && !current_line.includes(last_line.content)) {
+		if (last_line.index) {
+			// If length is different, should fire
+			// If last line is different, should fire
+			if (last_line.index !== current_line_index || (last_line.content && !current_line.includes(last_line.content))) {
 				console.log("noteChangeChecker: significant change detected!");
 				note_changed = true;
 			}
 		}
 		last_line.content = current_line;
 		last_line.index = current_line_index;
+		// console.log("last_line: ", last_line);
 	}
 	return note_changed;
 }
