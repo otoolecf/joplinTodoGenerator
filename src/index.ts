@@ -28,7 +28,7 @@ joplin.plugins.register({
 		console.info('Starting todo generator plugin!');
 		await joplin.workspace.onNoteSelectionChange(() => {
 			//fires when new note selected
-			logicHandler();
+			logicHandler(true);
 		});
 		await joplin.workspace.onNoteChange(async () => {
 			// runs when note changes
@@ -49,10 +49,12 @@ async function logicHandler(start=undefined) {
 				// console.log("note found. Note id: ", note.id);
 				let note_changed = await noteChangeChecker(note);
 				if (!note_changed && !start) return;
-				let new_timestamp = await addTimestamp(note.body)
-				if (new_timestamp) {
-					console.log("time for new timestamp! appending to note...")
-					await apppendToNote(note.id, note.body, new_timestamp, true);
+				if (start) {
+					let new_timestamp = await addTimestamp(note.body)
+					if (new_timestamp) {
+						console.log("time for new timestamp! appending to note...")
+						await apppendToNote(note.id, note.body, new_timestamp, true);
+					}
 				}
 				let keyword_items = findKeywords(note.body);
 				// console.log("logicHandler: found keywords: ", keyword_items);
